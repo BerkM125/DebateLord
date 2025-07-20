@@ -13,7 +13,11 @@ Use at your own risk.
 """
 # Standard library imports
 import os
+import json
 from typing import List, Optional, Dict, Any
+import uuid
+import hashlib
+import time
 
 # Third-party imports
 import pandas as pd
@@ -92,6 +96,37 @@ def get_youtube_video_title(video_url: str) -> str:
     except Exception as e:
         return f"Error: {str(e)}"
 
+def request_to_batch_job(system_instruction: str, video_url: str) -> Dict[str, Any]:
+    """
+    Create a batch job request for the Gemini API, saves it into the batch request jsonl file
+    
+    Args:
+        system_instruction (str): System instruction to guide the model.
+        video_url (str): URL of the YouTube video to analyze.
+        
+    Returns:
+        Dict[str, Any]: JSON object representing the batch job request.
+    """
+    
+    # Create a deterministic UUID based on video URL
+    namespace_uuid = uuid.UUID('6ba7b810-9dad-11d1-80b4-00c04fd430c8')  # UUID namespace for URLs
+    url_hash = hashlib.sha1(video_url.encode()).digest()
+    unique_id = str(uuid.uuid5(namespace_uuid, video_url))
+
+    batch_json = {
+        "contents": [
+            {
+                "parts": [
+                    {"text": f"SYSTEM: {system_instruction}\n\nUSER: {get_youtube_video_title(video_url)}"}
+                ]
+            }
+        ]
+    }
+
+    with open(os.path.join(module_dir, "./batch_instructions/batch_requests.jsonl"), "a") as f:
+        f.write(json.dumps(batch_json) + "\n")
+
+    return batch_json
 
 def load_system_instructions(file_path: str) -> str:
     """
@@ -143,7 +178,7 @@ def find_debate_videos(model: str, classifier: str='./system_instructions/conten
     tavily_client = TavilyClient(os.getenv("TAVILY_API_KEY"))
     response = tavily_client.search(query=open(os.path.join(module_dir, "./system_instructions/tavily_scraping_instructions.md")).read().strip(),
                          search_depth="advanced",
-                         max_results=5,
+                         max_results=3,
                          include_domains=["youtube.com"])
     
     debate_df = {
@@ -151,6 +186,8 @@ def find_debate_videos(model: str, classifier: str='./system_instructions/conten
         'title': [],
         'numSpeakers' : []
     }
+
+    # Old method, being replaced by batch job
     for video in response['results']:
         # Ensure that it's a valid debate video
         if is_debate_video(video['url'], model, classifier):
@@ -163,7 +200,41 @@ def find_debate_videos(model: str, classifier: str='./system_instructions/conten
             debate_df["ID"].append(video_id)
             debate_df["title"].append(video_title)
             debate_df["numSpeakers"].append(video_speakers)
+
+    # sys_instruct = load_system_instructions(os.path.join(module_dir, classifier))
+    # large_job = None
+    # # New method will first create a batch request to Gemini to determine if content is 
+    # # high quality and worth processing, and then process the batch job
+    # for video in response['results']:
+    #     all_batch_requests = []
+    #     all_batch_requests.append(request_to_batch_job(
+    #         system_instruction=sys_instruct,
+    #         video_url=video['url']
+    #     ))
     
+    # print(f"All batch requests: {all_batch_requests}")
+
+    # large_job = client.batches.create(
+    #     model="models/gemini-2.5-flash",
+    #     src=all_batch_requests,
+    #     config={
+    #         'display_name': 'Debate Video Content Classification Job'
+    #     }
+    # )
+    # print(f"Created batch job for video: {video['url']} with ID: {large_job.id}, called {large_job.name}")
+
+    # while large_job.state not in [genai.types.BatchJob.State.SUCCEEDED, genai.types.BatchJob.State.FAILED]:
+    #     print("Job still running, waiting 3 seconds...")
+    #     time.sleep(3)
+    #     large_job = client.batches.get(large_job.name)
+
+    # if large_job.state == genai.types.BatchJob.State.SUCCEEDED:
+    #     results = client.batches.get_output(large_job.name)
+    #     print(f"Batch job {large_job.name} completed successfully, processing results...")
+    #     print(f"BATCH RESULTS: {results}")
+    # else:
+    #     print(f"Batch job {large_job.name} failed with state: {large_job.state}")
+
     return pd.DataFrame(debate_df)
 
 def load_jubilee_videos():

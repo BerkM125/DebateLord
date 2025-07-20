@@ -90,7 +90,7 @@ def download_youtube_audio(video_id: str, output_dir: str="temp_audio") -> str:
         result = subprocess.run([
             'ffmpeg', '-i', input_file,
             '-ss', str(start_time),
-            '-t', '20',
+            '-t', '600',
             '-c', 'copy',
             output_file,
             '-y'  # Overwrite output file
