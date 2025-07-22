@@ -33,11 +33,16 @@ class DebateLord:
         """Initialize DebateLord with the fine-tuned model."""
         logger.info("Loading DebateLord model...")
         self.tokenizer = AutoTokenizer.from_pretrained(model_path)
+        
+        # Set up padding token
+        self.tokenizer.pad_token = self.tokenizer.eos_token
+        
         self.model = AutoModelForCausalLM.from_pretrained(
             model_path,
             torch_dtype=torch.float16,
             device_map="auto",
-            trust_remote_code=True
+            trust_remote_code=True,
+            pad_token_id=self.tokenizer.pad_token_id
         )
         logger.info("Model loaded successfully!")
         
