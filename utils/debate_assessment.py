@@ -37,10 +37,12 @@ if __name__ == "__main__":
     for fn in filenames:
         with open(os.path.join(module_dir, fn), "r") as curr_file:
             transcript = curr_file.read()
-            post_context_prompt = "Given this transcript of an approximately 10 minute long debate, assess which party in this debate won out over the other, and explain why they were the winner. Cite tone, evidence-backed arguments, good counterarguments and strategies, among other debate factors in your assessment."
 
+            # Set up full prompt
+            post_context_prompt = "Given this transcript of an approximately 10 minute long debate, assess which party in this debate won out over the other, and explain why they were the winner. Cite tone, evidence-backed arguments, good counterarguments and strategies, among other debate factors in your assessment."
             full_prompt = f"{transcript}\n\n{post_context_prompt}"
 
+            # Get assessment
             ai_assessment = client.models.generate_content(
                 model="gemini-2.5-flash",
                 contents=[
@@ -52,12 +54,35 @@ if __name__ == "__main__":
                 ]
             )
 
-            print(f"First debate, id {fn} assessment below: ")
+            # Print assessment and export to the assessment directory
+            print(f"Debate id {fn} assessment below: ")
             print(ai_assessment.text)
             print("\n\n")
 
             with open(os.path.join(module_dir, f"../data/processed/debate_assessments/debate{file_index}.txt"), 'w') as outf:
                 outf.write(f"VERDICT ON DEBATE ID {fn}: \n\n{ai_assessment.text}")
+
+            # Now set up the second full prompt
+            post_context_prompt = "Given this assessment of an approximately 10 minute long debate, assess which party in this debate won out over the other. Respond ONLY with the party's number as an integer with NO OTHER TEXT SURROUNDING IT, just the integer. Thinking is allowed, but do NOT paste that thinking into your response. Your response should JUST be the integer of the party who won."
+            full_prompt = f"{ai_assessment.text}\n\n{post_context_prompt}"
+
+            # Get this different assessment, perhaps reduce redundancy here
+            ai_assessment = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=[
+                    {
+                        "parts": [
+                            {"text": full_prompt}
+                        ]
+                    }
+                ]
+            )
+
+            # Export this shorter winner data
+            print(f"WINNER of debate #{file_index+1}: {ai_assessment.text}")
+
+            with open(os.path.join(module_dir, f"../data/processed/debate_winners/winner_of_{file_index}.txt"), 'w') as outf:
+                outf.write(f"{ai_assessment.text}")
             
             file_index += 1
 
