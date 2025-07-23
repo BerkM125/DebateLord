@@ -29,21 +29,46 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class DebateLord:
-    def __init__(self, model_path: str = "debatelord_model"):
+    def __init__(self, model_path: str = None):
         """Initialize DebateLord with the fine-tuned model."""
         logger.info("Loading DebateLord model...")
-        self.tokenizer = AutoTokenizer.from_pretrained(model_path)
         
-        # Set up padding token
-        self.tokenizer.pad_token = self.tokenizer.eos_token
+        # Try different possible model paths
+        possible_paths = [
+            model_path if model_path else "debatelord_model",
+            os.path.join(os.path.dirname(__file__), "debatelord_model"),
+            os.path.join(os.path.dirname(__file__), "models", "debatelord_model"),
+            "/content/drive/MyDrive/DebateLord/models/debatelord_model"  # For Colab
+        ]
         
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_path,
-            torch_dtype=torch.float16,
-            device_map="auto",
-            trust_remote_code=True,
-            pad_token_id=self.tokenizer.pad_token_id
-        )
+        model_loaded = False
+        for path in possible_paths:
+            try:
+                if os.path.exists(path):
+                    logger.info(f"Attempting to load model from: {path}")
+                    self.tokenizer = AutoTokenizer.from_pretrained(path)
+                    self.tokenizer.pad_token = self.tokenizer.eos_token
+                    
+                    self.model = AutoModelForCausalLM.from_pretrained(
+                        path,
+                        torch_dtype=torch.float16,
+                        device_map="auto",
+                        trust_remote_code=True,
+                        pad_token_id=self.tokenizer.pad_token_id
+                    )
+                    model_loaded = True
+                    logger.info(f"Successfully loaded model from {path}")
+                    break
+            except Exception as e:
+                logger.warning(f"Failed to load from {path}: {e}")
+                continue
+        
+        if not model_loaded:
+            raise RuntimeError(
+                "Could not load model from any location. "
+                "Please ensure the model is properly trained and saved. "
+                "Tried paths: " + ", ".join(possible_paths)
+            )
         logger.info("Model loaded successfully!")
         
         # Set up chat history
@@ -89,15 +114,15 @@ class DebateLord:
         self.chat_history = []
 
 def main():
-    # Check if model exists
-    if not os.path.exists("debatelord_model"):
+    try:
+        # Initialize the model - will try multiple possible locations
+        debate_lord = DebateLord()
+    except RuntimeError as e:
+        logger.error(f"Failed to initialize DebateLord: {e}")
         logger.error(
-            "Model not found! Please run tune_debatelord.py first to train the model."
+            "Please ensure you have run tune_debatelord.py and the model was saved properly."
         )
         return
-    
-    # Initialize the model
-    debate_lord = DebateLord()
     
     print(f"{Fore.GREEN}DebateLord initialized! Ready to debate.{Style.RESET_ALL}")
     print(f"{Fore.YELLOW}Type 'quit' to exit, 'clear' to clear chat history.{Style.RESET_ALL}")
