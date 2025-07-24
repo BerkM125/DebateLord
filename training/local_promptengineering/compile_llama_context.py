@@ -1,19 +1,15 @@
-from google import genai
-from dotenv import load_dotenv
+import asyncio
 import os
 
 module_dir = os.path.dirname(os.path.abspath(__file__))
 
-load_dotenv()
-client = genai.Client()
+# Get initial user's debate topic
+def initiate_conversation() -> str:
+    return str(input("Welcome to DebateLord. What would you like to debate about today?\n"))
 
-if __name__ == "__main__":
-    user_input = ""
-    print("Welcome to DebateLord. What would you like to debate about today?")
-    user_input = str(input())
-
+# Prepare all context for a well made prompt for DebateLord
+def prepare_debate_context(user_input: str) -> str: 
     training_data = ""
-    
     with open(os.path.join(module_dir, "./gemini_engineered_context.md"), "r+") as context_file:
         context = context_file.read()
         pre_data_ctx = context[0:context.index("[Insert here]")]
@@ -25,21 +21,5 @@ if __name__ == "__main__":
             training_data += f"\n{new_content}"
         
         context_file.close()
-
-    while user_input != "STOP":
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=[
-                {
-                    "parts": [
-                        {"text" : f"SYSTEM:\n{pre_data_ctx}\n{training_data}\n{post_data_ctx}\n\nUSER: {user_input}"}
-                    ]
-                }
-            ]
-        )
-
-        print(f"\n{response.text}\n")
-        user_input = str(input())
     
-    print("Done so soon? Can't blame you. Debate Lord, OUT!\n")
-
+    return f"SYSTEM:\n{pre_data_ctx}\n{training_data}\n{post_data_ctx}\n\nUSER: {user_input}"
