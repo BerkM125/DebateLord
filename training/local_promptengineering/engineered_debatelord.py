@@ -1,3 +1,15 @@
+"""
+File: engineered_debatelord.py
+Description: Handles the engineering of DebateLord's prompt and context for Gemini API.
+
+Author: Berkan Mertan
+Email: berkm@ihmail.com
+Copyright (c) 2025 Berkan Mertan. All rights reserved.
+
+This software is provided "as is" without warranty of any kind.
+Use at your own risk.
+"""
+
 import asyncio
 from google import genai
 from google.genai import types
@@ -45,15 +57,15 @@ async def main():
                     if chunk.text is not None:
                         print(chunk.text)
 
-        #             # The model might generate and execute Python code to use Search
-        #             model_turn = chunk.server_content.model_turn
-        #             if model_turn:
-        #                 for part in model_turn.parts:
-        #                     if part.executable_code is not None:
-        #                         print(part.executable_code.code)
+                    # The model might generate and execute Python code to use Search
+                    model_turn = chunk.server_content.model_turn
+                    if model_turn:
+                        for part in model_turn.parts:
+                            if part.executable_code is not None:
+                                print(part.executable_code.code)
 
-        #                     if part.code_execution_result is not None:
-        #                         print(part.code_execution_result.output)
+                            if part.code_execution_result is not None:
+                                print(part.code_execution_result.output)
         user_input = str(input())
 
 if __name__ == "__main__":
